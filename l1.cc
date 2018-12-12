@@ -1,24 +1,3 @@
-/* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
-/*
- * Copyright (c) 2015 Universita' degli Studi di Napoli "Federico II"
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation;
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- *
- * Author: Pasquale Imputato <p.imputato@gmail.com>
- * Author: Stefano Avallone <stefano.avallone@unina.it>
- */
-
 #include "ns3/core-module.h"
 #include "ns3/network-module.h"
 #include "ns3/internet-module.h"
@@ -26,41 +5,6 @@
 #include "ns3/applications-module.h"
 #include "ns3/traffic-control-module.h"
 #include "ns3/flow-monitor-module.h"
-
-// This simple example shows how to use TrafficControlHelper to install a 
-// QueueDisc on a device.
-//
-// The default QueueDisc is a pfifo_fast with a capacity of 1000 packets (as in
-// Linux). However, in this example, we install a RedQueueDisc with a capacity
-// of 10000 packets.
-//
-// Network topology
-//
-//       10.1.1.0
-// n0 -------------- n1
-//    point-to-point
-//
-// The output will consist of all the traced changes in the length of the RED
-// internal queue and in the length of the netdevice queue:
-//
-//    DevicePacketsInQueue 0 to 1
-//    TcPacketsInQueue 7 to 8
-//    TcPacketsInQueue 8 to 9
-//    DevicePacketsInQueue 1 to 0
-//    TcPacketsInQueue 9 to 8
-//
-// plus some statistics collected at the network layer (by the flow monitor)
-// and the application layer. Finally, the number of packets dropped by the
-// queuing discipline, the number of packets dropped by the netdevice and
-// the number of packets requeued by the queuing discipline are reported.
-//
-// If the size of the DropTail queue of the netdevice were increased from 1
-// to a large number (e.g. 1000), one would observe that the number of dropped
-// packets goes to zero, but the latency grows in an uncontrolled manner. This
-// is the so-called bufferbloat problem, and illustrates the importance of
-// having a small device queue, so that the standing queues build in the traffic
-// control layer where they can be managed by advanced queue discs rather than
-// in the device layer.
 
 using namespace ns3;
 

@@ -10,27 +10,14 @@ using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE ("TrafficControlExample");
 
-void
-TcPacketsInQueueTrace (uint32_t oldValue, uint32_t newValue)
-{
-  std::cout << "TcPacketsInQueue " << oldValue << " to " << newValue << std::endl;
-}
-
-void
-DevicePacketsInQueueTrace (uint32_t oldValue, uint32_t newValue)
-{
-  std::cout << "DevicePacketsInQueue " << oldValue << " to " << newValue << std::endl;
-}
-
 int
 main (int argc, char *argv[])
 {
   double simulationTime = 10; //seconds
-  std::string transportProt = "Tcp";
+  std::string transportProt = "Udp";
   std::string socketType;
 
   CommandLine cmd;
-  cmd.AddValue ("transportProt", "Transport protocol to use: Tcp, Udp", transportProt);
   cmd.Parse (argc, argv);
 
   if (transportProt.compare ("Tcp") == 0)
@@ -43,15 +30,15 @@ main (int argc, char *argv[])
     }
 
   NodeContainer nodes;
-  nodes.Create (2);
+  nodes.Create (3);
 
   PointToPointHelper pointToPoint;
   pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("10Mbps"));
   pointToPoint.SetChannelAttribute ("Delay", StringValue ("2ms"));
   pointToPoint.SetQueue ("ns3::DropTailQueue", "Mode", StringValue ("QUEUE_MODE_PACKETS"), "MaxPackets", UintegerValue (1));
 
-  NetDeviceContainer devices;
-  devices = pointToPoint.Install (nodes);
+  NetDeviceContainer devices1 = pointToPoint.Install (nodes.Get(0),nodes.Get(1));
+  NetDeviceContainer devices2 = pointToPoint.Install (nodes.Get(1),nodes.Get(2));
 
   InternetStackHelper stack;
   stack.Install (nodes);
@@ -60,29 +47,24 @@ main (int argc, char *argv[])
   uint16_t handle = tch.SetRootQueueDisc ("ns3::RedQueueDisc");
   // Add the internal queue used by Red
   tch.AddInternalQueues (handle, 1, "ns3::DropTailQueue", "MaxPackets", UintegerValue (10000));
-  QueueDiscContainer qdiscs = tch.Install (devices);
+  QueueDiscContainer qdiscs1 = tch.Install (devices1);
+  QueueDiscContainer qdiscs2 = tch.Install (devices2);
 
-  Ptr<QueueDisc> q = qdiscs.Get (1);
-  q->TraceConnectWithoutContext ("PacketsInQueue", MakeCallback (&TcPacketsInQueueTrace));
-  // Alternatively:
-  // Config::ConnectWithoutContext ("/NodeList/1/$ns3::TrafficControlLayer/RootQueueDiscList/0/PacketsInQueue",
-  //                                MakeCallback (&TcPacketsInQueueTrace));
+  Ipv4AddressHelper address1;
+  address1.SetBase ("10.1.1.0", "255.255.255.0");
+  Ipv4InterfaceContainer interfaces1 = address1.Assign (devices1);
 
-  Ptr<NetDevice> nd = devices.Get (1);
-  Ptr<PointToPointNetDevice> ptpnd = DynamicCast<PointToPointNetDevice> (nd);
-  Ptr<Queue> queue = ptpnd->GetQueue ();
-  queue->TraceConnectWithoutContext ("PacketsInQueue", MakeCallback (&DevicePacketsInQueueTrace));
+  Ipv4AddressHelper address2;
+  address2.SetBase ("10.1.2.0", "255.255.255.0");
+  Ipv4InterfaceContainer interfaces2 = address2.Assign (devices2);
 
-  Ipv4AddressHelper address;
-  address.SetBase ("10.1.1.0", "255.255.255.0");
-
-  Ipv4InterfaceContainer interfaces = address.Assign (devices);
+ Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
 
   //Flow
   uint16_t port = 7;
   Address localAddress (InetSocketAddress (Ipv4Address::GetAny (), port));
   PacketSinkHelper packetSinkHelper (socketType, localAddress);
-  ApplicationContainer sinkApp = packetSinkHelper.Install (nodes.Get (0));
+  ApplicationContainer sinkApp = packetSinkHelper.Install (nodes.Get (2));
 
   sinkApp.Start (Seconds (0.0));
   sinkApp.Stop (Seconds (simulationTime + 0.1));
@@ -97,9 +79,9 @@ main (int argc, char *argv[])
   onoff.SetAttribute ("DataRate", StringValue ("50Mbps")); //bit/s
   ApplicationContainer apps;
 
-  AddressValue remoteAddress (InetSocketAddress (interfaces.GetAddress (0), port));
+  AddressValue remoteAddress (InetSocketAddress (interfaces2.GetAddress (1), port));
   onoff.SetAttribute ("Remote", remoteAddress);
-  apps.Add (onoff.Install (nodes.Get (1)));
+  apps.Add (onoff.Install (nodes.Get (0)));
   apps.Start (Seconds (1.0));
   apps.Stop (Seconds (simulationTime + 0.1));
 
@@ -126,18 +108,6 @@ main (int argc, char *argv[])
   std::cout << "  Mean jitter:   " << stats[1].jitterSum.GetSeconds () / (stats[1].rxPackets - 1) << std::endl;
 
   Simulator::Destroy ();
-
-  std::cout << std::endl << "*** Application statistics ***" << std::endl;
-  double thr = 0;
-  uint32_t totalPacketsThr = DynamicCast<PacketSink> (sinkApp.Get (0))->GetTotalRx ();
-  thr = totalPacketsThr * 8 / (simulationTime * 1000000.0); //Mbit/s
-  std::cout << "  Rx Bytes: " << totalPacketsThr << std::endl;
-  std::cout << "  Average Goodput: " << thr << " Mbit/s" << std::endl;
-  std::cout << std::endl << "*** TC Layer statistics ***" << std::endl;
-  std::cout << "  Packets dropped by the TC layer: " << q->GetTotalDroppedPackets () << std::endl;
-  std::cout << "  Bytes dropped by the TC layer: " << q->GetTotalDroppedBytes () << std::endl;
-  std::cout << "  Packets dropped by the netdevice: " << queue->GetTotalDroppedPackets () << std::endl;
-  std::cout << "  Packets requeued by the TC layer: " << q->GetTotalRequeuedPackets () << std::endl;
 
   return 0;
 }
